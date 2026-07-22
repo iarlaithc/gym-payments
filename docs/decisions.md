@@ -9,3 +9,7 @@ mostly for speed and familiarity, ef core lets us swap later if wanted
 
 ## 2026-07-22 - Using long and cents instead of decimal and euros in Payment model
 this matches what stripe have in their docs
+
+## 2026-07-22 - stripe sheckout Sessions instead of custom payment forms
+used stripes hosted Checkout page rather than building a custom card form, at the cost of less control over the payment page's styling. 
+reasonable tradeoff for a project this size, less touching of customer data also.
