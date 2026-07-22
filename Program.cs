@@ -1,10 +1,14 @@
 using Stripe;
+using Microsoft.EntityFrameworkCore;
+using GymPayments.Models;
+using GymPayments.Data;
 
+// Builder
 var builder = WebApplication.CreateBuilder(args);
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+// Services
+builder.Services.AddDbContext<GymPaymentsContext>(options => options.UseSqlite("Data Source=gympayments.db"));
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
