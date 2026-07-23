@@ -2,6 +2,7 @@ using Stripe;
 using Microsoft.EntityFrameworkCore;
 using GymPayments.Models;
 using GymPayments.Data;
+using System.ComponentModel.DataAnnotations;
 
 // Builder
 var builder = WebApplication.CreateBuilder(args);
@@ -21,7 +22,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-///testing
+/// Endpoints testing
 app.MapGet("/stripe-test", async () =>
 {
     var service = new Stripe.BalanceService();
@@ -54,6 +55,64 @@ app.MapPost("/checkout/{type}", async (string type, string email, IConfiguration
     var session = await service.CreateAsync(options);
 
     return Results.Ok(new { checkoutUrl = session.Url });
+});
+
+// Webhook 
+app.MapPost("/webhook", async (HttpRequest request, GymPaymentsContext db, IConfiguration config) =>
+{
+    var json = await new StreamReader(request.Body).ReadToEndAsync();
+    var webhookSecret = config["Stripe:WebhookSecret"];
+
+    Event stripeEvent;
+    try
+    {
+        // verifies the signature
+        stripeEvent = EventUtility.ConstructEvent(
+            json,
+            request.Headers["Stripe-Signature"],
+            webhookSecret
+        );
+    }
+    catch (StripeException e)
+    {
+        return Results.BadRequest($"Webhook siognature verification failed: {e.Message}");
+    }
+
+    if (stripeEvent.Type == "checkout.session.completed")
+    {
+        var session = stripeEvent.Data.Object as Stripe.Checkout.Session;
+        var email = session!.CustomerEmail ?? session.CustomerDetails?.Email ?? "unknown";
+        var stripeCustomerId = session.CustomerId ?? "";
+
+        // find or create member
+        var member = await db.Members.FirstOrDefaultAsync(m => m.Email == email);
+        if (member is null)
+        {
+            member = new Member
+            {
+                Id = Guid.NewGuid(),
+                Name = email, // placeholder
+                Email = email,
+                StripeCustomerId = stripeCustomerId
+            };
+            db.Members.Add(member);
+        }
+
+        // record payment in db
+        var payment = new Payment
+        {
+            Id = Guid.NewGuid(),
+            MemberId = member.Id,
+            StripePaymentIntentId = session.PaymentIntentId,
+            Amount = session.AmountTotal ?? 0,
+            Currency = session.Currency ?? "eur",
+            Status = "succeeded",
+            Type = session.Mode == "subscription" ? "subscription" : "drop_in"
+        };
+        db.Payments.Add(payment);
+        await db.SaveChangesAsync();
+    }
+    return Results.Ok();
 });
 
 app.Run();
