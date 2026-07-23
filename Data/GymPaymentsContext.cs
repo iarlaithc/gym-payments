@@ -9,4 +9,11 @@ public class GymPaymentsContext : DbContext
     public DbSet<Member> Members => Set<Member>();
     public DbSet<Membership> Memberships => Set<Membership>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ProcessedWebhookEvent>().HasKey(e => e.StripeEventId);
+    }
+
 }

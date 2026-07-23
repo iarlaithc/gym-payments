@@ -2,7 +2,7 @@ using Stripe;
 using Microsoft.EntityFrameworkCore;
 using GymPayments.Models;
 using GymPayments.Data;
-using System.ComponentModel.DataAnnotations;
+using GymPayments;
 
 // Builder
 var builder = WebApplication.CreateBuilder(args);
@@ -78,6 +78,11 @@ app.MapPost("/webhook", async (HttpRequest request, GymPaymentsContext db, IConf
         return Results.BadRequest($"Webhook siognature verification failed: {e.Message}");
     }
 
+    // check if event already processed
+    var alreadyProcessed = await db.ProcessedWebhookEvents.AnyAsync(e => e.StripeEventId == stripeEvent.Id);
+    if (alreadyProcessed) return Results.Ok();
+
+    // positive event
     if (stripeEvent.Type == "checkout.session.completed")
     {
         var session = stripeEvent.Data.Object as Stripe.Checkout.Session;
@@ -109,9 +114,13 @@ app.MapPost("/webhook", async (HttpRequest request, GymPaymentsContext db, IConf
             Status = "succeeded",
             Type = session.Mode == "subscription" ? "subscription" : "drop_in"
         };
+
         db.Payments.Add(payment);
-        await db.SaveChangesAsync();
     }
+
+    db.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent {StripeEventId = stripeEvent.Id});
+    await db.SaveChangesAsync();
+
     return Results.Ok();
 });
 
