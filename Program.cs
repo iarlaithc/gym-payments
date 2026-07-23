@@ -14,7 +14,6 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -80,6 +79,7 @@ app.MapPost("/webhook", async (HttpRequest request, GymPaymentsContext db, IConf
 
     // check if event already processed
     var alreadyProcessed = await db.ProcessedWebhookEvents.AnyAsync(e => e.StripeEventId == stripeEvent.Id);
+
     if (alreadyProcessed) return Results.Ok();
 
     // positive event
@@ -91,6 +91,7 @@ app.MapPost("/webhook", async (HttpRequest request, GymPaymentsContext db, IConf
 
         // find or create member
         var member = await db.Members.FirstOrDefaultAsync(m => m.Email == email);
+
         if (member is null)
         {
             member = new Member
@@ -102,6 +103,18 @@ app.MapPost("/webhook", async (HttpRequest request, GymPaymentsContext db, IConf
             };
             db.Members.Add(member);
         }
+
+        if (session.Mode == "subscription")
+        {
+            db.Memberships.Add(new Membership
+            {
+                Id = Guid.NewGuid(),
+                MemberId = member.Id,
+                StripeSubscriptionId = session.SubscriptionId ?? "",
+                Status = "active",
+                CurrentPeriodEnd = DateTime.UtcNow.AddMonths(1) // TODO placeholder value to be gotten
+            });
+        }        
 
         // record payment in db
         var payment = new Payment
@@ -117,8 +130,34 @@ app.MapPost("/webhook", async (HttpRequest request, GymPaymentsContext db, IConf
 
         db.Payments.Add(payment);
     }
+    else if (stripeEvent.Type == "invoice.payment_failed")
+    {
+        var invoice = stripeEvent.Data.Object as Stripe.Invoice;
+        var stripeCustomerId = invoice!.CustomerId;
+        var member = await db.Members.FirstOrDefaultAsync(m => m.StripeCustomerId == stripeCustomerId);
+        if (member is not null)
+        {
+            var membership = await db.Memberships.FirstOrDefaultAsync(m => m.MemberId == member.Id);
+            
+            if (membership is not null)
+            {
+                membership.Status = "past_due";
+            }
+
+            db.Payments.Add(new Payment
+            {
+                Id = Guid.NewGuid(),
+                MemberId = member.Id,
+                StripeInvoiceId = invoice.Id,
+                Amount = invoice.AmountDue,
+                Currency = invoice.Currency ?? "eur",
+                Type = "subscription"
+            });
+        }
+    }
 
     db.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent {StripeEventId = stripeEvent.Id});
+
     await db.SaveChangesAsync();
 
     return Results.Ok();

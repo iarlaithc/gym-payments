@@ -23,3 +23,12 @@ webhook handler is not yet set up to prevent duplicate transactions, 200 codes c
 stripe has a unique id on every event so take that and store it, check against previous records and skip if handled.
 checking before processing and recording in the same transaction as the business data with a SaveChangesAsync call, so a real failure will be retried and not logged.
 Verified using `stripe events resend` and confirmed no duplicate rows on redelivery.
+
+## 2026-07-23 - Membership status tracking and failed payment handling
+added invoice.payment_failed handling which marks the members Membership as "past_due" and records a failed Payment. 
+this depended on a Membership row existing, which checkout.session.completed wasn't creating one for subscription mode. 
+fixed both together.
+Note: known limitation, atm placeholder value of now + 1 month for CurrentPeriodEnd instead of getting the actual value in an API call
+Will revisit later
+
+
