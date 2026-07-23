@@ -19,7 +19,7 @@ StripePaymentIntentId and StripeInvoiceId are blank, due to checkout session in 
 the charge reference lives in the invoice to be handled later, unlike one off payments
 
 ## 2026-07-23 - duplication prevention mechanism 
-webhook handler is not yet set up to prevent duplicate transactions, 200 codes can cause duplicate data
-stripe has a unique id on every event so take that and store it, check against previous records and skip if handled
-checking before processing and recording in the same transaction as the business data with a SaveChangesAsync call, so a real failure will be retried and not logged
- 
+webhook handler is not yet set up to prevent duplicate transactions, 200 codes can cause duplicate data.
+stripe has a unique id on every event so take that and store it, check against previous records and skip if handled.
+checking before processing and recording in the same transaction as the business data with a SaveChangesAsync call, so a real failure will be retried and not logged.
+Verified using `stripe events resend` and confirmed no duplicate rows on redelivery.
