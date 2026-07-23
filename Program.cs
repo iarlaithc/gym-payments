@@ -104,15 +104,18 @@ app.MapPost("/webhook", async (HttpRequest request, GymPaymentsContext db, IConf
             db.Members.Add(member);
         }
 
-        if (session.Mode == "subscription")
+        if (session.Mode == "subscription" && session.SubscriptionId is not null)
         {
+            var subscriptionService = new Stripe.SubscriptionService();
+            var subscription = await subscriptionService.GetAsync(session.SubscriptionId);
+
             db.Memberships.Add(new Membership
             {
                 Id = Guid.NewGuid(),
                 MemberId = member.Id,
-                StripeSubscriptionId = session.SubscriptionId ?? "",
-                Status = "active",
-                CurrentPeriodEnd = DateTime.UtcNow.AddMonths(1) // TODO placeholder value to be gotten
+                StripeSubscriptionId = session.SubscriptionId,
+                Status = subscription.Status,
+                CurrentPeriodEnd = subscription.Items.Data.First().CurrentPeriodEnd
             });
         }        
 

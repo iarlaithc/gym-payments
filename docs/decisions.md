@@ -30,5 +30,6 @@ this depended on a Membership row existing, which checkout.session.completed was
 fixed both together.
 Note: known limitation, atm placeholder value of now + 1 month for CurrentPeriodEnd instead of getting the actual value in an API call
 Will revisit later
+**Resolved 2026-07-23:** now fetching the real CurrentPeriodEnd and Status via SubscriptionService.GetAsync()
 
 
