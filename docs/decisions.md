@@ -32,4 +32,7 @@ Note: known limitation, atm placeholder value of now + 1 month for CurrentPeriod
 Will revisit later
 **Resolved 2026-07-23:** now fetching the real CurrentPeriodEnd and Status via SubscriptionService.GetAsync()
 
-
+## 2026-07-23 - split Program.cs into Endpoints and Services
+moved endpoint registration into static classes (Endpoints/) and business logic into a WebhookHandlerService (Services/). 
+Program.cs is now just composition. This keeps Program.cs from bloating even more as more endpoints get added.
+Also keeps webhook logic testable independent of http issues 
